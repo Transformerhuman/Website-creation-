@@ -7,7 +7,9 @@ import {
 } from '../../../types/index';
 
 const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
-  const [activeTab, setActiveTab] = useState<'news' | 'market' | 'partners' | 'corporate' | 'schemes'>('news');
+  const [activeTab, setActiveTab] = useState<'news' | 'market' | 'partners' | 'corporate' | 'schemes' | 'storage'>('news');
+  const [storageData, setStorageData] = useState<{ images: any[]; emails: any[] }>({ images: [], emails: [] });
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
   const [data, setData] = useState<{
     news: NewsItem[],
     shop: Product[],
@@ -18,8 +20,10 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
     news: [], shop: [], partners: [], enrollments: [], schemes: []
   });
   const [isCreating, setIsCreating] = useState(false);
-  const [formData, setFormData] = useState<Partial<NewsItem & Product & PartnerFarm & { name_en: string, name_ne: string, description_en: string, description_ne: string, category: string }>>({});
+  // Extended form type covers all tabs: news, market, schemes
+  const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploading, setUploading] = useState(false);
+  const [uploadStats, setUploadStats] = useState<{ savingPercent: number; compressedKb: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ type: string, id: string } | null>(null);
   
   const API_BASE = '/api';
@@ -51,25 +55,48 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
     } catch (err) { console.error(err); }
   };
 
+  const fetchStorage = async () => {
+    const token = localStorage.getItem('ap_admin_token');
+    try {
+      const [imgRes, emlRes] = await Promise.all([
+        fetch('/api/admin/storage/images', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/admin/storage/emails',  { headers: { 'Authorization': `Bearer ${token}` } }),
+      ]);
+      const [imgData, emlData] = await Promise.all([imgRes.json(), emlRes.json()]);
+      setStorageData({
+        images: imgData.files  || [],
+        emails: emlData.emails || [],
+      });
+    } catch (err) { console.error('[storage fetch]', err); }
+  };
+
   useEffect(() => { 
     const token = localStorage.getItem('ap_admin_token');
     if (!token) {
       window.location.reload();
       return;
     }
-    fetchData(); 
+    fetchData();
+    fetchStorage();
+
+    // Poll every 5 seconds so frontend reflects admin changes immediately
+    const pollInterval = setInterval(() => { fetchData(); fetchStorage(); }, 5000);
 
     // Strict 2-minute session limit
     const sessionTimer = setTimeout(() => {
       logout();
     }, 120000); // 120,000ms = 2 minutes
 
-    return () => clearTimeout(sessionTimer);
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(sessionTimer);
+    };
   }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     setUploading(true);
+    setUploadStats(null);
     const token = localStorage.getItem('ap_admin_token');
     const form = new FormData();
     form.append('image', e.target.files[0]);
@@ -80,9 +107,24 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
         body: form
       });
       const data = await res.json();
-      if (data.url) setFormData({ ...formData, imageUrl: data.url });
-    } catch (err) { alert("Upload failed"); }
-    finally { setUploading(false); }
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (data.url) {
+        setFormData(prev => ({ ...prev, imageUrl: data.url }));
+        // Show compression stats badge
+        if (data.savingPercent !== undefined) {
+          setUploadStats({
+            savingPercent: data.savingPercent,
+            compressedKb: Math.round(data.compressedSize / 1024),
+          });
+          // Auto-dismiss after 4 seconds
+          setTimeout(() => setUploadStats(null), 4000);
+        }
+      }
+    } catch (err: any) {
+      alert('Upload failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -164,13 +206,33 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Thumbnail / Image</label>
                 <div className="relative group">
-                  <div className={`aspect-video rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all ${formData.imageUrl ? 'border-solid border-green-500' : 'hover:border-slate-400'}`}>
-                    {formData.imageUrl ? (
-                      <img src={formData.imageUrl} className="w-full h-full object-cover" />
+                  <div className={`aspect-video rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all relative ${
+                    formData.imageUrl ? 'border-solid border-green-500' : 'hover:border-slate-400'
+                  }`}>
+                    {uploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-slate-400 font-black text-[10px] uppercase tracking-widest">Compressing…</span>
+                      </div>
+                    ) : formData.imageUrl ? (
+                      <>
+                        <img src={formData.imageUrl} className="w-full h-full object-cover" />
+                        {uploadStats && (
+                          <div className="absolute top-2 right-2 bg-green-600 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg animate-in fade-in zoom-in duration-300">
+                            ✦ {uploadStats.savingPercent}% saved · {uploadStats.compressedKb} KB
+                          </div>
+                        )}
+                      </>
                     ) : (
-                      <span className="text-slate-400 font-black text-xs uppercase tracking-widest">{uploading ? 'Uploading...' : 'Drop image here'}</span>
+                      <span className="text-slate-400 font-black text-xs uppercase tracking-widest">Drop image here</span>
                     )}
-                    <input type="file" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    />
                   </div>
                 </div>
               </div>
@@ -220,11 +282,12 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
 
       <div className="flex overflow-x-auto gap-2 mb-12 border-b border-slate-100 pb-4 scrollbar-hide">
         {[
-          { id: 'news', label: '📰 Reports' },
-          { id: 'partners', label: '🤝 Partners' },
+          { id: 'news',      label: '📰 Reports'  },
+          { id: 'partners',  label: '🤝 Partners'  },
           { id: 'corporate', label: '🏢 Corporate' },
-          { id: 'market', label: '🛒 Market' },
-          { id: 'schemes', label: '📜 Schemes' }
+          { id: 'market',    label: '🛒 Market'    },
+          { id: 'schemes',   label: '📜 Schemes'   },
+          { id: 'storage',   label: '🗄️ Storage'   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[10px] uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === tab.id ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 border hover:bg-slate-50'}`}>{tab.label}</button>
         ))}
@@ -235,11 +298,17 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
           <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
              <h2 className="text-xl md:text-2xl font-black news-serif mb-8">News Reports</h2>
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {data.news.map((n) => (
+                {data.news.map((n: any) => (
                   <div key={n._id} className="p-6 bg-slate-50 rounded-2xl border flex flex-col group">
                      <div className="flex justify-between items-start mb-4">
-                        <img src={n.imageUrl} className="w-16 h-16 rounded-xl object-cover shadow-sm" />
-                        <button onClick={() => setConfirmDelete({ type: 'news', id: n._id })} className="text-red-500 text-[10px] font-black uppercase hover:bg-red-50 px-3 py-1 rounded-lg">Delete</button>
+                        {n.imageUrl && (
+                          <img
+                            src={n.imageUrl}
+                            className="w-16 h-16 rounded-xl object-cover shadow-sm"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <button onClick={() => setConfirmDelete({ type: 'news', id: n._id ?? '' })} className="text-red-500 text-[10px] font-black uppercase hover:bg-red-50 px-3 py-1 rounded-lg">Delete</button>
                      </div>
                      <h4 className="font-bold text-sm leading-tight mb-2">{n.title}</h4>
                      <p className="text-[9px] text-slate-400 font-black uppercase">{n.author} • {n.category}</p>
@@ -271,11 +340,17 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
           <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
              <h2 className="text-xl md:text-2xl font-black news-serif mb-8">Market Management</h2>
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {data.shop.map((p) => (
+                {data.shop.map((p: any) => (
                   <div key={p._id} className="p-5 md:p-6 bg-slate-50 rounded-2xl border flex flex-col group">
                      <div className="flex justify-between items-start mb-4">
-                        <img src={p.imageUrl} className="w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover shadow-sm" />
-                        <button onClick={() => setConfirmDelete({ type: 'products', id: p._id })} className="text-red-500 text-[9px] font-black uppercase hover:bg-red-50 px-3 py-1 rounded-lg">Remove</button>
+                        {p.imageUrl && (
+                          <img
+                            src={p.imageUrl}
+                            className="w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover shadow-sm"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <button onClick={() => setConfirmDelete({ type: 'products', id: p._id ?? '' })} className="text-red-500 text-[9px] font-black uppercase hover:bg-red-50 px-3 py-1 rounded-lg">Remove</button>
                      </div>
                      <h4 className="font-bold text-sm">{p.name_en}</h4>
                      <p className="text-[9px] text-slate-400 font-black uppercase">Seller: {p.seller}</p>
@@ -290,10 +365,16 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
           <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border shadow-sm">
              <h2 className="text-xl md:text-2xl font-black news-serif mb-8">Partner Authorization</h2>
              <div className="space-y-4 md:space-y-6">
-                {data.partners.map((p) => (
+                {data.partners.map((p: any) => (
                   <div key={p._id} className="p-6 md:p-8 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] border flex flex-col lg:flex-row justify-between items-center gap-6">
                      <div className="flex items-center gap-4 md:gap-6 w-full lg:w-auto">
-                        <img src={p.imageUrl} className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover shadow-md" />
+                        {p.imageUrl && (
+                          <img
+                            src={p.imageUrl}
+                            className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover shadow-md"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
                         <div>
                            <h4 className="text-lg md:text-xl font-black">{p.farmName}</h4>
                            <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase">{p.ownerName} • {p.contactPhone}</p>
@@ -301,8 +382,8 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
                         </div>
                      </div>
                      <div className="flex gap-2 w-full lg:w-auto">
-                        {p.status !== 'approved' && <button onClick={() => handleStatusUpdate('partners', p._id, 'approved')} className="flex-1 lg:flex-none bg-green-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approve</button>}
-                        <button onClick={() => setConfirmDelete({ type: 'partners', id: p._id })} className="flex-1 lg:flex-none bg-white text-red-500 border border-red-100 px-6 py-3 rounded-xl font-black text-[10px] uppercase">Reject</button>
+                        {p.status !== 'approved' && <button onClick={() => handleStatusUpdate('partners', p._id ?? '', 'approved')} className="flex-1 lg:flex-none bg-green-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approve</button>}
+                        <button onClick={() => setConfirmDelete({ type: 'partners', id: p._id ?? '' })} className="flex-1 lg:flex-none bg-white text-red-500 border border-red-100 px-6 py-3 rounded-xl font-black text-[10px] uppercase">Reject</button>
                      </div>
                   </div>
                 ))}
@@ -314,19 +395,135 @@ const AdminPanel: React.FC<{ lang: 'en' | 'ne' }> = ({ lang }) => {
           <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border shadow-sm">
              <h2 className="text-xl md:text-2xl font-black news-serif mb-8">Corporate Enrollments</h2>
              <div className="space-y-4 md:space-y-6">
-                {data.enrollments.map((e) => (
+                {data.enrollments.map((e: any) => (
                   <div key={e._id} className="p-6 md:p-8 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] border flex flex-col md:flex-row justify-between items-center gap-4">
                      <div className="w-full md:w-auto">
                         <h4 className="text-lg font-black">{e.fullName}</h4>
                         <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase tracking-widest">📍 {e.farmLocation} • 📞 {e.phone}</p>
                      </div>
                      <div className="flex gap-2 w-full md:w-auto">
-                        {e.status !== 'approved' && <button onClick={() => handleStatusUpdate('corporate-enrollments', e._id, 'approved')} className="flex-1 md:flex-none bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">Enroll</button>}
-                        <button onClick={() => setConfirmDelete({ type: 'corporate-enrollments', id: e._id })} className="text-red-400 px-3 hover:bg-red-50 rounded-lg transition-colors">✕</button>
+                        {e.status !== 'approved' && <button onClick={() => handleStatusUpdate('corporate-enrollments', e._id ?? '', 'approved')} className="flex-1 md:flex-none bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">Enroll</button>}
+                        <button onClick={() => setConfirmDelete({ type: 'corporate-enrollments', id: e._id ?? '' })} className="text-red-400 px-3 hover:bg-red-50 rounded-lg transition-colors">✕</button>
                      </div>
                   </div>
                 ))}
              </div>
+          </div>
+        )}
+
+        {/* ─── Storage Tab ──────────────────────────────────────────────────── */}
+        {activeTab === 'storage' && (
+          <div className="space-y-10">
+
+            {/* Image Gallery */}
+            <div className="bg-white p-6 md:p-10 rounded-[2rem] border shadow-sm">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-xl md:text-2xl font-black news-serif">📁 Image Storage</h2>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border">
+                  {storageData.images.length} files
+                </span>
+              </div>
+              {storageData.images.length === 0 ? (
+                <p className="text-slate-400 text-sm font-bold text-center py-12">No images uploaded yet.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {storageData.images.map((img: any) => (
+                    <div key={img.filename} className="group relative rounded-2xl overflow-hidden border shadow-sm bg-slate-50">
+                      <img
+                        src={img.url}
+                        alt={img.filename}
+                        className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22><rect fill=%22%23f1f5f9%22 width=%221%22 height=%221%22/></svg>'; }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <button
+                          onClick={async () => {
+                            const token = localStorage.getItem('ap_admin_token');
+                            await fetch(`/api/admin/storage/images/${img.filename}`, {
+                              method: 'DELETE',
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            fetchStorage();
+                          }}
+                          className="bg-red-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-lg"
+                        >Delete</button>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-[8px] font-black text-slate-400 uppercase truncate">{img.filename}</p>
+                        <p className="text-[8px] text-slate-300">{img.sizeKb} KB</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Email Inbox */}
+            <div className="bg-white p-6 md:p-10 rounded-[2rem] border shadow-sm">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-xl md:text-2xl font-black news-serif">📧 Helpdesk Inbox</h2>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border">
+                  {storageData.emails.length} messages
+                </span>
+              </div>
+              {storageData.emails.length === 0 ? (
+                <p className="text-slate-400 text-sm font-bold text-center py-12">No helpdesk submissions yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {storageData.emails.map((email: any) => (
+                    <div key={email.id} className="border rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedEmail(expandedEmail === email.id ? null : email.id)}
+                        className="w-full flex items-center justify-between p-5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black text-sm shrink-0">
+                            {(email.name || email.userId || '?')[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-black text-sm">{email.name || email.userId || 'Anonymous'}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                              {email.email || ''} {email.phone ? '• ' + email.phone : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-[9px] text-slate-300 font-bold">
+                            {email.receivedAt ? new Date(email.receivedAt).toLocaleString() : ''}
+                          </span>
+                          <span className="text-slate-400">{expandedEmail === email.id ? '▲' : '▼'}</span>
+                        </div>
+                      </button>
+                      {expandedEmail === email.id && (
+                        <div className="p-6 border-t bg-white space-y-4">
+                          {email.category && (
+                            <span className="inline-block bg-amber-50 text-amber-700 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-amber-100">
+                              {email.category}
+                            </span>
+                          )}
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{email.query}</p>
+                          <div className="flex justify-end pt-2">
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem('ap_admin_token');
+                                await fetch(`/api/admin/storage/emails/${email.id}`, {
+                                  method: 'DELETE',
+                                  headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                setExpandedEmail(null);
+                                fetchStorage();
+                              }}
+                              className="text-[10px] font-black uppercase text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors"
+                            >Archive / Delete</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </div>

@@ -97,8 +97,13 @@ export interface ApplicationSubmission {
 
 export interface HelplineRequest {
   id?: string;
-  userId: string;
+  userId?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  category?: string;
   query: string;
+  date?: string;
 }
 
 export interface MarketPrice {

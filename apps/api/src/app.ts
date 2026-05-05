@@ -13,6 +13,9 @@ import { getRedis, redisHealthy } from './config/redis.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import crudRoutes from './modules/crud/crud.routes.js';
 import uploadRoutes from './modules/upload/upload.routes.js';
+import storageRoutes, { IMAGES_DIR } from './modules/storage/storage.routes.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +23,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // --- Static Assets ---
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));  // legacy compat
+app.use('/images', express.static(IMAGES_DIR));  // new storage/images/ directory
 
 // --- Correlation ID Middleware ---
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -70,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authRoutes); // Backwards compatibility for signup
 app.use('/api', crudRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api/admin/storage', storageRoutes);
 
 // Health Check
 app.get('/api/health', async (req: Request, res: Response) => {

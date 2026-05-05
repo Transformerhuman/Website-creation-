@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import db from '../../config/db.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { rateLimit } from 'express-rate-limit';
+import { saveEmailToStorage } from '../storage/storage.routes.js';
 
 const router = Router();
 
@@ -55,6 +56,11 @@ export const setupCrudRoute = (path: string, zodSchema?: any, protectPost = fals
       const validatedData = zodSchema ? zodSchema.parse(req.body) : req.body;
       const [newId] = await db(table).insert(validatedData).returning('id');
       const item = await db(table).where('id', newId).first();
+
+      // Persist helpline/contact submissions to storage/emails/ as JSON files
+      if (path === 'helpline') {
+        saveEmailToStorage({ source: 'helpline', ...validatedData });
+      }
 
       res.json({ ...item, _id: item.id });
     } catch (err: any) {
