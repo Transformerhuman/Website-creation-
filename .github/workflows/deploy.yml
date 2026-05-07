@@ -20,14 +20,16 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
           
-       - name: Debug AWS Identity
-  run: |
-    aws sts get-caller-identity
-    echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"  
+      - name: Debug AWS Identity
+        run: |
+          aws sts get-caller-identity
+          echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"  
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
+        
 
       - name: Build, tag, and push API image to Amazon ECR
         env:
