@@ -17,6 +17,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
+          
+       - name: Debug AWS Identity
+  run: |
+    aws sts get-caller-identity
+    echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"  
 
       - name: Login to Amazon ECR
         id: login-ecr
