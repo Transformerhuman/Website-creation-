@@ -1,15 +1,18 @@
 FROM node:20-alpine
+
 WORKDIR /app
 
-# Docker is now looking from the ROOT of the repo
+# If your API code is in the root directory
 COPY package*.json ./
-COPY api/package*.json ./api/
-COPY packages ./packages
-
 RUN npm install
 
-# Copy the source code relative to the root
-COPY api ./api
+COPY . .
+
+# OR if your API code is in a subdirectory called 'api'
+# COPY api/package*.json ./
+# RUN npm install
+# COPY api .
 
 EXPOSE 3000
-CMD ["npx", "tsx", "api/src/server.ts"]
+
+CMD ["npx", "tsx", "src/server.ts"]
