@@ -1,17 +1,31 @@
+# ============================================================
+# GitHub Actions Workflow: Deploy to AWS
+# Purpose: Automates the deployment of AgroPulse application
+#          to AWS infrastructure using Docker, ECR, and Terraform
+# ============================================================
+
 name: Deploy to AWS
 
+# Trigger this workflow when code is pushed to the main branch
 on:
   push:
     branches: [ main ]
 
+# Define the deployment job
 jobs:
   deploy:
+    # Use the latest Ubuntu runner for the build environment
     runs-on: ubuntu-latest
+    
     steps:
+      # Step 1: Checkout the repository code
+      # fetch-depth: 0 ensures we get the complete git history
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # ensure all files are fetched 
 
+      # Step 2: Configure AWS credentials for authentication
+      # Uses temporary credentials from AWS Learner's Lab (rotates every 2 hours)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         
@@ -21,15 +35,31 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
           
+      # Step 3: Debug step to verify AWS identity and permissions
+      # Confirms that the credentials are working correctly
       - name: Debug AWS Identity
         run: |
           aws sts get-caller-identity
           echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"  
 
+      # Step 4: Debug step to verify file structure before Docker build
+      # Helps identify missing files (like nginx config) before build fails
+      - name: Debug Files
+        run: |
+          pwd
+          find . -maxdepth 3 -type f -name "*.conf"
+          find . -maxdepth 3 -type d -name "nginx"
+          ls -la infra/ 2>/dev/null || echo "infra directory not found"
+          ls -la infra/nginx/ 2>/dev/null || echo "infra/nginx directory not found"
+
+      # Step 5: Authenticate Docker with Amazon ECR (Elastic Container Registry)
+      # This allows us to push Docker images to AWS ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Step 6: Build and push the API backend Docker image
+      # Creates a Docker image for the backend API service
       - name: Build, tag, and push API image to Amazon ECR
         id: build-api
         env:
@@ -41,6 +71,8 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "api_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+      # Step 7: Build and push the Web frontend Docker image
+      # Creates a Docker image for the frontend web application with Nginx
       - name: Build, tag, and push Web image to Amazon ECR
         id: build-web
         env:
@@ -48,17 +80,24 @@ jobs:
           ECR_REPOSITORY: agropulse-web
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f infra/docker/web.Dockerfile .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f infra/docker/Dockerfile.web .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "web_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+      # Step 8: Install Terraform on the runner
+      # Terraform is used to manage AWS infrastructure as code
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      # Step 9: Initialize Terraform
+      # Downloads required providers and sets up the backend
       - name: Terraform Init
         working-directory: ./infra/terraform
         run: terraform init
 
+      # Step 10: Apply Terraform configuration
+      # Deploys/updates AWS infrastructure with the new Docker images
+      # Passes database password, IAM role ARN, and Docker image URIs as variables
       - name: Terraform Apply
         working-directory: ./infra/terraform
         run: |
