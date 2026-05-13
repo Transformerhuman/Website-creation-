@@ -4,19 +4,17 @@ on:
   push:
     branches: [ main ]
 
-on:
-  push:
-    branches: [ main ]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # ensure all files are fetched 
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
+        
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -31,33 +29,28 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      
+
       - name: Build, tag, and push API image to Amazon ECR
+        id: build-api
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: agropulse-api
           IMAGE_TAG: ${{ github.sha }}
-       run: |
-         # Create temporary build structure
-         mkdir -p build-context/api
-         cp -r ./* build-context/api/ 2>/dev/null || true
-    
-          cd build-context
+        run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f infra/docker/api.Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "api_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        id: build-api
 
       - name: Build, tag, and push Web image to Amazon ECR
+        id: build-web
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: agropulse-web
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f infra/docker/web.Dockerfile .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f infra/docker/Dockerfile.web .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "web_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        id: build-web
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
