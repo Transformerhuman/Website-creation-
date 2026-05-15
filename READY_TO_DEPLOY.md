@@ -69,6 +69,7 @@ aws sts get-caller-identity
 ✅ **Terraform Backend** - Ready for your S3 bucket  
 ✅ **ECS Execution Role** - Created proper IAM role for Fargate  
 ✅ **PostgreSQL Version** - Updated from 16.1 to 16.3  
+✅ **Architecture Change** - Replaced RDS with EC2 + PostgreSQL  
 ✅ **Documentation** - Updated with your bucket name  
 
 ---
