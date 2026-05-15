@@ -13,15 +13,17 @@
 - ✅ Workflow now properly formatted for GitHub Actions
 
 #### Fixed: `infra/docker/web.Dockerfile`
-- ✅ Changed `packages/web` to `apps/web` (correct monorepo path)
-- ✅ Updated build command to use workspace: `npm run build --workspace=apps/web`
-- ✅ Fixed dist path from `/app/dist` to `/app/apps/web/dist`
+- ✅ **CRITICAL FIX**: Removed `--workspace=apps/web` flag from build command
+- ✅ Changed from `npm run build --workspace=apps/web` to `npm run build`
+- ✅ Simplified Dockerfile to copy web app directly to `/app`
+- ✅ Fixed dist output path from `/app/apps/web/dist` to `/app/dist`
+- ✅ Workspace commands only work from monorepo root, not in isolated builds
 
 #### Fixed: `infra/docker/api.Dockerfile`
+- ✅ **CRITICAL FIX**: Simplified Dockerfile structure
+- ✅ Removed unnecessary directory changes (`WORKDIR /app/apps/api`)
+- ✅ Copy API directly to `/app` for simpler build process
 - ✅ Removed confusing comments and placeholder code
-- ✅ Properly configured for monorepo structure
-- ✅ Added correct COPY commands for `apps/api` directory
-- ✅ Set proper working directory
 
 #### Fixed: `.dockerignore`
 - ✅ Updated for monorepo structure
@@ -34,6 +36,7 @@
 - ✅ Added `ALLOWED_ORIGIN` environment variable
 - ✅ Added `restart: unless-stopped` policy for all services
 - ✅ Created named volume `api-uploads` for persistent storage
+- ✅ Fixed volume mount path from `/app/apps/api/uploads` to `/app/uploads`
 - ✅ Updated JWT_SECRET warning message
 
 #### Fixed: `.gitignore`
@@ -145,12 +148,17 @@ Your project is now **100% ready** for AWS deployment via GitHub Actions!
 6. `docker-compose.yml` - Fixed paths and added configs
 7. `.gitignore` - Added Terraform exclusions
 
-### Created Files (5):
+### Created Files (9):
 1. `.env` - Local environment config
 2. `.env.production` - Production environment template
 3. `.gitignore.terraform` - Terraform ignore patterns
 4. `AWS_DEPLOYMENT.md` - Deployment guide
 5. `README.md` - Project documentation
+6. `DOCKER_BUILD_FIX.md` - Docker build troubleshooting guide
+7. `test-docker-builds.bat` - Windows test script
+8. `test-docker-builds.sh` - Linux/Mac test script
+9. `apps/web/.dockerignore` - Web app Docker ignore
+10. `apps/api/.dockerignore` - API Docker ignore
 
 ### Deleted Files (3):
 1. `entrypoint.sh` - Unused
@@ -174,7 +182,9 @@ Your project is now **100% ready** for AWS deployment via GitHub Actions!
 ### Critical Issues:
 - ✅ Duplicate imports causing compilation errors
 - ✅ GitHub Actions syntax error breaking CI/CD
-- ✅ Wrong Dockerfile paths preventing Docker builds
+- ✅ **Docker build failure: workspace commands don't work in isolated builds**
+- ✅ **Wrong Dockerfile paths preventing Docker builds**
+- ✅ **Incorrect dist output paths in web Dockerfile**
 - ✅ Missing environment variables for production
 
 ### Infrastructure Issues:

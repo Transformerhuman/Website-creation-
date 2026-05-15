@@ -20,7 +20,7 @@ services:
       - db
       - redis
     volumes:
-      - api-uploads:/app/apps/api/uploads
+      - api-uploads:/app/uploads
     restart: unless-stopped
 
   web:
