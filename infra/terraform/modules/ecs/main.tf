@@ -8,7 +8,7 @@ variable "lab_role_arn" {
     error_message = "lab_role_arn must be a valid IAM role ARN (e.g., arn:aws:iam::123456789012:role/LabRole). Check your GitHub secret LAB_ROLE_ARN."
   }
 }
-variable "api_image" {}
+variable "api_imsage" {}
 variable "web_image" {}
 variable "db_url" {}
 variable "redis_url" {}
@@ -43,8 +43,8 @@ resource "aws_security_group" "ecs_tasks" {
 # API Task Definition
 resource "aws_ecs_task_definition" "api" {
   family                   = "agropulse-api"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
+  network_mode             = "bridge"
+  requires_compatibilities = ["EC2"]
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = var.lab_role_arn
@@ -66,8 +66,8 @@ resource "aws_ecs_task_definition" "api" {
 # Web (Frontend) Task Definition
 resource "aws_ecs_task_definition" "web" {
   family                   = "agropulse-web"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
+  network_mode             = "bridge"
+  requires_compatibilities = ["EC2"]
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = var.lab_role_arn
@@ -86,7 +86,7 @@ resource "aws_ecs_service" "api" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
+  launch_type     = "EC2"
 
   network_configuration {
     subnets          = var.subnet_ids
@@ -100,7 +100,7 @@ resource "aws_ecs_service" "web" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.web.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
+  launch_type     = "EC2"
 
   network_configuration {
     subnets          = var.subnet_ids
