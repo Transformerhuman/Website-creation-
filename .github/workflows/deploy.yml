@@ -95,6 +95,15 @@ jobs:
       - name: Configure Terraform Backend
         working-directory: ./infra/terraform
         run: |
+          # Check if TERRAFORM_STATE_BUCKET secret is configured
+          if [ -z "${{ secrets.TERRAFORM_STATE_BUCKET }}" ]; then
+            echo "::error::TERRAFORM_STATE_BUCKET secret is not configured!"
+            echo "::error::Please create an S3 bucket and add it to GitHub Secrets"
+            echo "::error::See AWS_DEPLOYMENT.md for instructions"
+            exit 1
+          fi
+          
+          echo "Configuring Terraform backend with bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}"
           terraform init -reconfigure \
             -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
             -backend-config="key=agropulse/terraform.tfstate" \
