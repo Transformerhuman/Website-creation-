@@ -1,7 +1,6 @@
 variable "vpc_id" {}
 variable "subnet_ids" { type = list(string) }
 variable "db_password" {}
-variable "lab_role_arn" {}
 
 # Security Group for PostgreSQL EC2 instance
 resource "aws_security_group" "postgres_ec2" {
@@ -36,7 +35,6 @@ resource "aws_instance" "postgres" {
   instance_type = "t3.micro"
   subnet_id     = var.subnet_ids[0]
   vpc_security_group_ids = [aws_security_group.postgres_ec2.id]
-  iam_instance_profile = aws_iam_instance_profile.ec2_postgres.name
   
   root_block_device {
     volume_size = 30
@@ -74,36 +72,6 @@ resource "aws_instance" "postgres" {
               # Restart to apply all changes
               systemctl restart postgresql
               EOF
-}
-
-# IAM Role for EC2 to access ECR and SSM
-resource "aws_iam_role" "ec2_postgres_role" {
-  name = "agropulse-ec2-postgres-role"
-  
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# Attach SSM Managed Instance Core policy for remote management
-resource "aws_iam_role_policy_attachment" "ec2_ssm" {
-  role       = aws_iam_role.ec2_postgres_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-# Instance Profile
-resource "aws_iam_instance_profile" "ec2_postgres" {
-  name = "agropulse-ec2-postgres-profile"
-  role = aws_iam_role.ec2_postgres_role.name
 }
 
 # Output the private IP for database connection

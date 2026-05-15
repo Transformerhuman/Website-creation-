@@ -15,8 +15,10 @@ All issues are resolved and code is ready for deployment!
 - ✅ Corrected Dockerfile paths for monorepo structure
 
 ### 2. Infrastructure Issues ✅
-- ✅ Created ECS execution role (`agropulse-ecs-execution-role`)
-- ✅ Attached `AmazonECSTaskExecutionRolePolicy`
+- ✅ **AWS Learner's Lab Compatible** - No IAM role creation!
+- ✅ Used existing `LabRole` for ECS (provided by Learner's Lab)
+- ✅ Removed ALL IAM resource creation (roles, policies, profiles)
+- ✅ Simplified EC2 PostgreSQL (no IAM role required)
 - ✅ Fixed PostgreSQL version (16.1 → 16.3)
 - ✅ **Replaced RDS with EC2 + PostgreSQL** (due to permission constraints)
 
