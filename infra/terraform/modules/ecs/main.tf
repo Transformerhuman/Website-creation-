@@ -8,7 +8,7 @@ variable "lab_role_arn" {
     error_message = "lab_role_arn must be a valid IAM role ARN (e.g., arn:aws:iam::123456789012:role/LabRole). Check your GitHub secret LAB_ROLE_ARN."
   }
 }
-variable "api_imsage" {}
+variable "api_image" {}
 variable "web_image" {}
 variable "db_url" {}
 variable "redis_url" {}
