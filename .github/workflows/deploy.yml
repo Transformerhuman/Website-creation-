@@ -134,4 +134,4 @@ jobs:
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -var="lab_role_arn=${{ secrets.LAB_ROLE_ARN }}" \
             -var="api_image=${{ steps.build-api.outputs.api_image }}" \
-            -var="web_image=${{ steps.build-web.outputs.web_image }}"#
+            -var="web_image=${{ steps.build-web.outputs.web_image }}"

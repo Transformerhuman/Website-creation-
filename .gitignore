@@ -26,3 +26,9 @@ yarn-error.log*
 
 # Docker
 .docker/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars

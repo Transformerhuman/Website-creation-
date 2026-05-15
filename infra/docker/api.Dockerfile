@@ -2,16 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# If your API code is in the root directory
 COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+
 RUN npm install
 
-COPY . .
+COPY apps/api ./apps/api
 
-# OR if your API code is in a subdirectory called 'api'
-# COPY api/package*.json ./
-# RUN npm install
-# COPY api .
+WORKDIR /app/apps/api
 
 EXPOSE 3000
 

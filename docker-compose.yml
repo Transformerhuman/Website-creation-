@@ -2,7 +2,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: infra/docker/api.Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -12,22 +12,26 @@ services:
       - DB_USER=${DB_USER:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-password}
       - DB_NAME=${DB_NAME:-agropulse}
-      - JWT_SECRET=${JWT_SECRET:-supersecret}
-      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=${POSTGRES_URL:-postgres://postgres:password@db:5432/agropulse}
+      - JWT_SECRET=${JWT_SECRET:-supersecret_change_this_in_production}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
     depends_on:
       - db
       - redis
     volumes:
-      - ./apps/api/uploads:/app/apps/api/uploads
+      - api-uploads:/app/apps/api/uploads
+    restart: unless-stopped
 
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: infra/docker/web.Dockerfile
     ports:
       - "80:80"
     depends_on:
       - api
+    restart: unless-stopped
 
   db:
     image: postgres:15-alpine
@@ -39,11 +43,14 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    restart: unless-stopped
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  api-uploads:

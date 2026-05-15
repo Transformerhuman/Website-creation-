@@ -14,8 +14,6 @@ import authRoutes from './modules/auth/auth.routes.js';
 import crudRoutes from './modules/crud/crud.routes.js';
 import uploadRoutes from './modules/upload/upload.routes.js';
 import storageRoutes, { IMAGES_DIR } from './modules/storage/storage.routes.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
