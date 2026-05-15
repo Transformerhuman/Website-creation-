@@ -2,6 +2,22 @@ variable "vpc_id" {}
 variable "subnet_ids" { type = list(string) }
 variable "db_password" {}
 
+# Get the latest Amazon Linux 2023 AMI dynamically
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 # Security Group for PostgreSQL EC2 instance
 resource "aws_security_group" "postgres_ec2" {
   name   = "agropulse-postgres-ec2-sg"
@@ -31,7 +47,7 @@ resource "aws_security_group" "postgres_ec2" {
 
 # EC2 Instance for PostgreSQL
 resource "aws_instance" "postgres" {
-  ami           = "ami-0c55b159cbfafe1f0"  # Amazon Linux 2023 (us-east-1)
+  ami           = data.aws_ami.amazon_linux.id  # Use dynamic AMI lookup
   instance_type = "t3.micro"
   subnet_id     = var.subnet_ids[0]
   vpc_security_group_ids = [aws_security_group.postgres_ec2.id]

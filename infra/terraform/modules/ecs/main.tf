@@ -1,6 +1,13 @@
 variable "vpc_id" {}
 variable "subnet_ids" { type = list(string) }
-variable "lab_role_arn" { description = "Existing ARN for LabRole in Learners Lab" }
+variable "lab_role_arn" { 
+  description = "Existing ARN for LabRole in Learners Lab"
+  
+  validation {
+    condition     = can(regex("^arn:aws:iam::", var.lab_role_arn))
+    error_message = "lab_role_arn must be a valid IAM role ARN (e.g., arn:aws:iam::123456789012:role/LabRole). Check your GitHub secret LAB_ROLE_ARN."
+  }
+}
 variable "api_image" {}
 variable "web_image" {}
 variable "db_url" {}
