@@ -2,29 +2,26 @@
 FROM node:20-alpine AS build-stage
 WORKDIR /app
 
-# Copy root package files if using workspaces
+# Copy package files
 COPY package*.json ./
 COPY packages/web/package*.json ./packages/web/
 
-# Copy packages
-COPY packages /app/packages
-
-# Install deps (cached unless package.json changes)
+# Install dependencies
 RUN npm install
 
-# Copy source last (changes most often)
-COPY packages/web .
+# Copy the entire monorepo
+COPY . .
 
-# Set working directory to the web package
+# Build only the web package
 WORKDIR /app/packages/web
 RUN npm run build
 
 # Production stage
 FROM nginx:stable-alpine AS production-stage
-# Adjust the dist path based on your build output
+# Copy the built files (adjust path based on your build output)
 COPY --from=build-stage /app/packages/web/dist /usr/share/nginx/html
-# OR if build output goes to /app/dist
+# Or if building from root outputs to /app/dist
 # COPY --from=build-stage /app/dist /usr/share/nginx/html
-COPY --chown=nginx:nginx infra/docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --chown=nginx:nginx /app/infra/docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
