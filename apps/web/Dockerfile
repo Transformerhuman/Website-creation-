@@ -1,14 +1,12 @@
+# Build stage
 FROM node:20-alpine AS build-stage
 WORKDIR /app
 
 # Copy root package files
 COPY package*.json ./
 
-# Copy web app from apps directory (NOT packages)
+# Copy web app package.json
 COPY apps/web/package*.json ./apps/web/
-
-# Copy packages directory if it exists (optional)
-COPY packages /app/packages 2>/dev/null || true
 
 # Install dependencies
 RUN npm install
@@ -25,7 +23,7 @@ FROM nginx:stable-alpine AS production-stage
 # Copy nginx configuration
 COPY infra/docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built files
+# Copy built files from build stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
 EXPOSE 80
