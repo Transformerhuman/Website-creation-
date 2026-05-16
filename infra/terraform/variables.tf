@@ -21,3 +21,9 @@ variable "web_image" {
   type        = string
   description = "Docker image for the Web"
 }
+
+variable "user_data" {
+  description = "Additional user data script to append"
+  type        = string
+  default     = ""  # Empty by default
+}
