@@ -2,6 +2,12 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "availability_zones" {
+  description = "List of availability zones to use for subnets"
+  type        = list(string)
+  default     = []  # Empty list means use data source
+}
+  
 variable "db_password" {
   type      = string
   sensitive = true
