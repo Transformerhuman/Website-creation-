@@ -90,13 +90,14 @@ resource "aws_instance" "this" {
     volume_type = var.root_volume_type
   }
 
-  user_data = var.install_docker && var.user_data == "" ? <<-EOF
+  user_data = var.user_data != "" ? var.user_data : (var.install_docker ? <<-EOF
               #!/bin/bash
               yum update -y
               yum install -y docker
               systemctl start docker
               systemctl enable docker
-              EOF : var.user_data
+              EOF
+  : "")
 
   user_data_replace_on_change = true
 
