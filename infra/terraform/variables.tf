@@ -21,3 +21,9 @@ variable "web_image" {
   type        = string
   description = "Docker image for the Web"
 }
+
+variable "lab_role_arn" {
+  description = "IAM Role ARN FOR ECS Ececution"
+  type        =  string
+  default     = "arn:aws:iam::511675495090:role/LabRole" 
+}
