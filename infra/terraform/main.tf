@@ -23,11 +23,12 @@ module "vpc" {
 #   db_password  = var.db_password
 # }
 
-module "redis" {
-  source     = "./modules/elasticache"
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.public_subnets
-}
+# Redis Module - DISABLED (will use Redis on EC2 instead)
+# module "redis" {
+#   source     = "./modules/elasticache"
+#   vpc_id     = module.vpc.vpc_id
+#   subnet_ids = module.vpc.public_subnets
+# }
 
 # ECS Module - DISABLED (Too many issues with Learner's Lab)
 # module "ecs" {

@@ -16,26 +16,31 @@ output "api_url" {
 # Server Access
 # ============================================
 
-output "app_server_public_ip" {
-  value       = module.docker_deployment.app_server_public_ip
-  description = "App server public IP for SSH access"
+output "web_server_public_ip" {
+  value       = module.docker_deployment.web_server_public_ip
+  description = "Web server public IP (frontend)"
+}
+
+output "api_server_public_ip" {
+  value       = module.docker_deployment.api_server_public_ip
+  description = "API server public IP (backend)"
 }
 
 output "bastion_public_ip" {
   value       = module.docker_deployment.bastion_public_ip
-  description = "Bastion host public IP (SSH jump box to database)"
+  description = "Bastion host public IP (SSH jump box)"
 }
 
 # ============================================
 # Internal IPs (for reference)
 # ============================================
 
+output "redis_server_private_ip" {
+  value       = module.docker_deployment.redis_server_private_ip
+  description = "Redis server private IP (not publicly accessible)"
+}
+
 output "db_server_private_ip" {
   value       = module.docker_deployment.db_server_private_ip
   description = "Database server private IP (not publicly accessible)"
-}
-
-output "app_server_private_ip" {
-  value       = module.docker_deployment.app_server_private_ip
-  description = "App server private IP"
 }

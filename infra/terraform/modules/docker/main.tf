@@ -29,19 +29,13 @@ data "aws_ami" "amazon_linux" {
 # SECURITY GROUPS (using reusable module)
 # ============================================
 
-module "app_server_sg" {
+module "api_server_sg" {
   source = "../security-group"
-  name   = "agropulse-app-server-sg"
+  name   = "agropulse-api-server-sg"
   vpc_id = var.vpc_id
-  description = "Security group for application server (web + API)"
+  description = "Security group for API server"
 
   ingress_rules = [
-    {
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
     {
       from_port   = 3000
       to_port     = 3000
@@ -57,6 +51,50 @@ module "app_server_sg" {
   ]
 }
 
+module "web_server_sg" {
+  source = "../security-group"
+  name   = "agropulse-web-server-sg"
+  vpc_id = var.vpc_id
+  description = "Security group for web server"
+
+  ingress_rules = [
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "redis_server_sg" {
+  source = "../security-group"
+  name   = "agropulse-redis-server-sg"
+  vpc_id = var.vpc_id
+  description = "Security group for Redis server"
+
+  ingress_with_security_groups = [
+    {
+      from_port       = 6379
+      to_port         = 6379
+      protocol        = "tcp"
+      security_group_ids = [module.api_server_sg.id]
+    },
+    {
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      security_group_ids = [module.bastion_sg.id]
+    }
+  ]
+}
+
 module "db_server_sg" {
   source = "../security-group"
   name   = "agropulse-db-server-sg"
@@ -68,7 +106,7 @@ module "db_server_sg" {
       from_port       = 5432
       to_port         = 5432
       protocol        = "tcp"
-      security_group_ids = [module.app_server_sg.id]
+      security_group_ids = [module.api_server_sg.id]
     },
     {
       from_port       = 22
@@ -98,6 +136,94 @@ module "bastion_sg" {
 # ============================================
 # EC2 INSTANCES (using reusable module)
 # ============================================
+
+module "api_server" {
+  source = "../ec2-instance"
+  name   = "agropulse-api-server"
+  ami_id = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+  subnet_id = var.public_subnet_id
+  security_group_ids = [module.api_server_sg.id]
+  associate_public_ip = true
+  root_volume_size = 20
+  root_volume_type = "gp3"
+  install_docker = true
+  
+  user_data = <<-EOF
+              #!/bin/bash
+              # Install Docker is handled by the module
+              
+              # Wait for Docker to be ready
+              sleep 10
+              
+              # Run API container
+              docker run -d \
+                --name api \
+                -p 3000:3000 \
+                -e POSTGRES_URL=postgresql://postgres:${var.db_password}@${module.db_server.private_ip}:5432/agropulse \
+                -e REDIS_URL=redis://${module.redis_server.private_ip}:6379 \
+                -e NODE_ENV=production \
+                --restart unless-stopped \
+                ${var.api_image}
+              EOF
+}
+
+module "web_server" {
+  source = "../ec2-instance"
+  name   = "agropulse-web-server"
+  ami_id = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+  subnet_id = var.public_subnet_id
+  security_group_ids = [module.web_server_sg.id]
+  associate_public_ip = true
+  root_volume_size = 20
+  root_volume_type = "gp3"
+  install_docker = true
+  
+  user_data = <<-EOF
+              #!/bin/bash
+              # Install Docker is handled by the module
+              
+              # Wait for Docker to be ready
+              sleep 10
+              
+              # Run Web container (Nginx)
+              docker run -d \
+                --name web \
+                -p 80:80 \
+                --restart unless-stopped \
+                ${var.web_image}
+              EOF
+}
+
+module "redis_server" {
+  source = "../ec2-instance"
+  name   = "agropulse-redis-server"
+  ami_id = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+  subnet_id = var.private_subnet_id
+  security_group_ids = [module.redis_server_sg.id]
+  associate_public_ip = false
+  root_volume_size = 20
+  root_volume_type = "gp3"
+  install_docker = true
+  
+  user_data = <<-EOF
+              #!/bin/bash
+              # Install Docker is handled by the module
+              
+              # Wait for Docker to be ready
+              sleep 10
+              
+              # Run Redis container
+              docker run -d \
+                --name redis \
+                -p 6379:6379 \
+                -v /data/redis:/data \
+                --restart unless-stopped \
+                redis:7-alpine
+              EOF
+}
 
 module "db_server" {
   source = "../ec2-instance"
@@ -147,85 +273,41 @@ module "bastion" {
   install_docker = true
 }
 
-module "app_server" {
-  source = "../ec2-instance"
-  name   = "agropulse-app-server"
-  ami_id = data.aws_ami.amazon_linux.id
-  instance_type = "t3.medium"
-  subnet_id = var.public_subnet_id
-  security_group_ids = [module.app_server_sg.id]
-  associate_public_ip = true
-  root_volume_size = 30
-  root_volume_type = "gp3"
-  install_docker = true
-  
-  user_data = <<-EOF
-              #!/bin/bash
-              # Install Docker is handled by the module
-              # Additional setup for application containers
-              
-              # Wait for Docker to be ready
-              sleep 10
-              
-              # Create Docker network
-              docker network create agropulse-network || true
-              
-              # Run API container
-              docker run -d \
-                --name api \
-                --network agropulse-network \
-                -p 3000:3000 \
-                -e POSTGRES_URL=postgresql://postgres:${var.db_password}@${module.db_server.private_ip}:5432/agropulse \
-                -e REDIS_URL=redis://${module.db_server.private_ip}:6379 \
-                -e NODE_ENV=production \
-                --restart unless-stopped \
-                ${var.api_image}
-              
-              # Run Web container (Nginx)
-              docker run -d \
-                --name web \
-                --network agropulse-network \
-                -p 80:80 \
-                --restart unless-stopped \
-                ${var.web_image}
-              
-              # Wait for services to start
-              sleep 10
-              
-              # Check if containers are running
-              docker ps
-              EOF
-}
-
 # ============================================
 # OUTPUTS
 # ============================================
 
-output "app_server_public_ip" {
-  value = module.app_server.public_ip
-  description = "Public IP to access the application (http://<IP>)"
+output "web_server_public_ip" {
+  value = module.web_server.public_ip
+  description = "Web server public IP (frontend website)"
 }
 
-output "app_server_private_ip" {
-  value = module.app_server.private_ip
+output "api_server_public_ip" {
+  value = module.api_server.public_ip
+  description = "API server public IP (backend API)"
+}
+
+output "application_url" {
+  value = "http://${module.web_server.public_ip}"
+  description = "Frontend website URL (open this in browser)"
+}
+
+output "api_url" {
+  value = "http://${module.api_server.public_ip}:3000"
+  description = "Backend API URL"
+}
+
+output "redis_server_private_ip" {
+  value = module.redis_server.private_ip
+  description = "Redis server private IP (internal use)"
 }
 
 output "db_server_private_ip" {
   value = module.db_server.private_ip
-  description = "Database server private IP (accessible from app server and bastion)"
+  description = "Database server private IP (internal use)"
 }
 
 output "bastion_public_ip" {
   value = module.bastion.public_ip
-  description = "Bastion host public IP (SSH here to access database)"
-}
-
-output "application_url" {
-  value = "http://${module.app_server.public_ip}"
-  description = "Application URL"
-}
-
-output "api_url" {
-  value = "http://${module.app_server.public_ip}:3000"
-  description = "API URL"
+  description = "Bastion host public IP (SSH jump box)"
 }
