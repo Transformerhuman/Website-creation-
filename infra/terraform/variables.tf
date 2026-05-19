@@ -28,6 +28,11 @@ variable "web_image" {
   description = "Docker image for the Web"
 }
 
+variable "ssh_key_name" {
+  description = "Name of the SSH key pair created in AWS EC2 Console"
+  type        = string
+}
+
 variable "user_data" {
   description = "Additional user data script to append"
   type        = string

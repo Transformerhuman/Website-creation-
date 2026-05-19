@@ -52,4 +52,5 @@ module "docker_deployment" {
   web_image         = var.web_image
   db_password       = var.db_password
   lab_role_arn      = var.lab_role_arn
+  ssh_key_name      = var.ssh_key_name
 }

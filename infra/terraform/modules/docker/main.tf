@@ -8,6 +8,7 @@ variable "api_image" {}
 variable "web_image" {}
 variable "db_password" {}
 variable "lab_role_arn" {}
+variable "ssh_key_name" {}
 
 # Get the latest Amazon Linux 2023 AMI
 data "aws_ami" "amazon_linux" {
@@ -148,6 +149,7 @@ module "api_server" {
   root_volume_size = 20
   root_volume_type = "gp3"
   install_docker = true
+  key_name = var.ssh_key_name
   
   user_data = <<-EOF
               #!/bin/bash
@@ -179,6 +181,7 @@ module "web_server" {
   root_volume_size = 20
   root_volume_type = "gp3"
   install_docker = true
+  key_name = var.ssh_key_name
   
   user_data = <<-EOF
               #!/bin/bash
@@ -207,6 +210,7 @@ module "redis_server" {
   root_volume_size = 20
   root_volume_type = "gp3"
   install_docker = true
+  key_name = var.ssh_key_name
   
   user_data = <<-EOF
               #!/bin/bash
@@ -236,6 +240,7 @@ module "db_server" {
   root_volume_size = 30
   root_volume_type = "gp3"
   install_docker = true
+  key_name = var.ssh_key_name
   
   user_data = <<-EOF
               #!/bin/bash
@@ -271,6 +276,7 @@ module "bastion" {
   root_volume_size = 10
   root_volume_type = "gp3"
   install_docker = true
+  key_name = var.ssh_key_name
 }
 
 # ============================================

@@ -63,6 +63,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "key_name" {
+  description = "SSH key pair name for accessing the instance"
+  type        = string
+  default     = ""
+}
+
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -84,6 +90,7 @@ resource "aws_instance" "this" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = var.security_group_ids
   associate_public_ip_address = var.associate_public_ip
+  key_name               = var.key_name != "" ? var.key_name : null
 
   root_block_device {
     volume_size = var.root_volume_size
