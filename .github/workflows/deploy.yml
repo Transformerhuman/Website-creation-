@@ -130,17 +130,19 @@ jobs:
           terraform plan \
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -var="lab_role_arn=${{ secrets.LAB_ROLE_ARN }}" \
+            -var="ssh_key_name=${{ secrets.SSH_KEY_NAME }}" \
             -var="api_image=${{ steps.build-api.outputs.api_image }}" \
             -var="web_image=${{ steps.build-web.outputs.web_image }}"
 
       # Step 13: Apply Terraform configuration
       # Deploys/updates AWS infrastructure with the new Docker images
-      # Passes database password, IAM role ARN, and Docker image URIs as variables
+      # Passes database password, IAM role ARN, SSH key name, and Docker image URIs as variables
       - name: Terraform Apply
         working-directory: ./infra/terraform
         run: |
           terraform apply -auto-approve \
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -var="lab_role_arn=${{ secrets.LAB_ROLE_ARN }}" \
+            -var="ssh_key_name=${{ secrets.SSH_KEY_NAME }}" \
             -var="api_image=${{ steps.build-api.outputs.api_image }}" \
             -var="web_image=${{ steps.build-web.outputs.web_image }}"
