@@ -103,6 +103,9 @@ resource "aws_instance" "this" {
               yum install -y docker
               systemctl start docker
               systemctl enable docker
+              sudo systemctl status sshd
+              sudo sustemctl start sshd
+              sudo systemctl ebnable sshd 
               EOF
   : "")
 
